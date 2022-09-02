@@ -1,13 +1,15 @@
 import { Router } from 'express';
 import validateRequestBody from '../middlewares/validateReqBody';
-import { login, register } from '../controllers/userController';
+import { login, register, updateUser, deleteUser, getAllUsers } from '../controllers/userController';
 import requestSchema from '../requestSchema/requestSchema';
+import { verifyToken } from '../utils/utilFunctions';
+
 const router: Router = Router();
 
-router.get('/');
+router.get('/users', verifyToken, getAllUsers);
 router.post('/register', validateRequestBody(requestSchema.registerSchema), register);
 router.post('/login', validateRequestBody(requestSchema.loginSchema), login);
-router.delete('/');
-router.put('/');
+router.delete('/users/:id', verifyToken, deleteUser);
+router.put('/users/:id', verifyToken, updateUser);
 
 export default router;

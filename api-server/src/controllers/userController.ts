@@ -1,7 +1,8 @@
-import bcrypt from 'bcrypt';
-import { NextFunction, Request, RequestHandler, Response } from "express";
-import User, { IUser } from "../database/Models/userModel";
-import { createToken } from '../utils/token';
+import {
+  NextFunction, Request, RequestHandler, Response,
+} from 'express';
+import User, { IUser } from '../database/Models/userModel';
+import { createToken, setCookieExpireTime } from '../utils/utilFunctions';
 
 export const register: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
   const { name, email, password }: IUser = req.body;
@@ -9,34 +10,74 @@ export const register: RequestHandler = async (req: Request, res: Response, next
     const oldUser = await User.findOne({ email });
     if (oldUser) return res.status(409).json({ message: 'User already exists' });
 
-    const salt = await bcrypt.genSalt(10);
-    const hashPass = await bcrypt.hash(password, salt);
+    const user = await User.create({
+      name, email, password,
+    });
 
-    const user = new User({ name, email, password: hashPass });
-    await user.save();
-    return res.status(201).json({ user });
+    return res.status(201).json({ message: 'Registration Successful', user });
   } catch (error: any) {
-    return res.json({ error });
+    return res.status(500).json({ error: error });
   }
 };
 
 export const login: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
   const { email, password }: IUser = req.body;
   try {
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select('+password');
+
     if (!user) return res.status(404).json({ message: 'Email not found' });
 
-    const isValidPass = await bcrypt.compare(password, user.password);
-    if (!isValidPass) return res.status(401).json({ message: 'Password is incorrect' });
+    const condition = await user.comparePassword(password);
+
+    if (!condition) return res.status(401).json({ message: 'Password is incorrect' });
 
     const token = createToken({ id: user._id, email });
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: true,
-      maxAge: 60 * 60 * 24
-    });
-    return res.json({ name: user.name, token }).status(200);
+    return res.status(200).cookie('token', token, { httpOnly: true, expires: setCookieExpireTime() })
+      .json({ message: 'Login Successful', token });
+
   } catch (error: any) {
-    return res.json({ error });
+    console.log(error);
+    return res.status(500).json({ error: error });
+  }
+};
+
+export const updateUser: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+  const { id } = req.params;
+  try {
+    const user = await User.findById({ _id: id });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const updatedUser = await User.findByIdAndUpdate({ _id: id }, req.body, { new: true });
+
+    return res.json({ user: updatedUser, message: 'Update Successful' }).status(200);
+  } catch (error: any) {
+    return res.status(500).json({ error: error });
+  }
+};
+
+export const deleteUser: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+  const { id } = req.params;
+
+  try {
+    const user = await User.findById({ _id: id });
+    console.log(user);
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    await User.findByIdAndDelete({ _id: id });
+
+    return res.json({ message: 'User Deleted Successfully' }).status(200);
+  } catch (error: any) {
+    return res.status(500).json({ error: error });
+  }
+};
+
+export const getAllUsers: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const users = await User.find();
+    return res.json({ users }).status(200);
+
+  } catch (error: any) {
+    return res.status(500).json({ error: error });
   }
 };

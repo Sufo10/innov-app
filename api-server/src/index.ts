@@ -1,5 +1,6 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import userRouter from './routes/userRouter';
 import config from './config/config';
 import './database/connection';
@@ -7,6 +8,7 @@ import './database/connection';
 const app: Application = express();
 
 app.use(cors());
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
